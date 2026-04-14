@@ -3,87 +3,158 @@
 require "pathling"
 
 describe Pathling do
-  let(:base_path) { "https://api.example.com" }
-  let(:uri) { described_class.new(base_path) }
-
   describe "#initialize" do
-    it "assigns the base path" do
-      expect(uri.base).to eq base_path
+    it "accepts no arguments" do
+      expect { described_class.new }.not_to raise_error
     end
 
-    it "initializes with empty parts and nil extension" do
-      expect(uri.parts).to be_empty
-      expect(uri.extension).to be_nil
+    it "accepts an empty string" do
+      expect { described_class.new("") }.not_to raise_error
+    end
+
+    it "accepts a non-empty string as base" do
+      expect { described_class.new("https://example.com") }.not_to raise_error
     end
   end
 
   describe "#path" do
-    it "returns a new instance and does not mutate the original" do
-      new_uri = uri.path("v1", "users")
-      expect(new_uri).not_to eq uri
-      expect(uri.parts).to be_empty
+    it "sets a single path segment" do
+      uri = described_class.new("base").path("foo")
+      expect(uri.build).to eq("base/foo")
     end
 
-    it "removes leading slashes from parts" do
-      new_uri = uri.path("/v1", "/users/")
-      expect(new_uri.parts).to eq ["v1", "users/"]
+    it "sets multiple path segments" do
+      uri = described_class.new("base").path("foo", "bar", "baz")
+      expect(uri.build).to eq("base/foo/bar/baz")
+    end
+
+    it "strips leading slashes from each segment" do
+      uri = described_class.new("base").path("/foo", "/bar")
+      expect(uri.build).to eq("base/foo/bar")
+    end
+
+    it "does not strip internal slashes" do
+      uri = described_class.new("base").path("foo/bar")
+      expect(uri.build).to eq("base/foo/bar")
+    end
+
+    it "replaces previously set path segments on second call" do
+      uri = described_class.new("base").path("first", "second").path("third")
+      expect(uri.build).to eq("base/third")
+    end
+
+    it "resets path segments when called with no arguments" do
+      uri = described_class.new("base").path("foo").path
+      expect(uri.build).to eq("base")
+    end
+
+    it "returns self for method chaining" do
+      uri = described_class.new("base")
+      expect(uri.path("foo")).to be(uri)
     end
   end
 
   describe "#with_ext" do
-    it "returns a new instance with the specified extension" do
-      new_uri = uri.with_ext(".json")
-      expect(new_uri.extension).to eq "json"
+    it "replaces an existing extension on the last segment" do
+      uri = described_class.new("base").path("file.md").with_ext("html")
+      expect(uri.build).to eq("base/file.html")
     end
 
-    it "handles extension string without a leading dot" do
-      new_uri = uri.with_ext("csv")
-      expect(new_uri.extension).to eq "csv"
+    it "adds an extension when the last segment has none" do
+      uri = described_class.new("base").path("file").with_ext("html")
+      expect(uri.build).to eq("base/file.html")
+    end
+
+    it "replaces only the last extension when the segment has multiple dots" do
+      uri = described_class.new("base").path("file.test.md").with_ext("html")
+      expect(uri.build).to eq("base/file.test.html")
+    end
+
+    it "strips a leading dot from the extension argument" do
+      uri = described_class.new("base").path("file.md").with_ext(".html")
+      expect(uri.build).to eq("base/file.html")
+    end
+
+    it "applies to the last segment among multiple path segments" do
+      uri = described_class.new("base").path("a", "b", "file.md").with_ext("html")
+      expect(uri.build).to eq("base/a/b/file.html")
+    end
+
+    it "returns self for method chaining" do
+      uri = described_class.new("base")
+      expect(uri.with_ext("html")).to be(uri)
     end
   end
 
   describe "#build" do
-    it "joins parts into a valid path" do
-      result = uri.path("v1", "items").build
-      expect(result).to eq "https://api.example.com/v1/items"
+    it "returns the base alone when no path segments are set" do
+      uri = described_class.new("https://example.com")
+      expect(uri.build).to eq("https://example.com")
     end
 
-    it "appends the extension to the path" do
-      result = uri.path("image").with_ext("png").build
-      expect(result).to eq "https://api.example.com/image.png"
+    it "joins base and path segments with forward slashes" do
+      uri = described_class.new("https://example.com").path("a", "b")
+      expect(uri.build).to eq("https://example.com/a/b")
     end
 
-    it "replaces an existing extension" do
-      result = described_class.new("file.txt").with_ext("pdf").build
-      expect(result).to eq "file.pdf"
+    it "strips a trailing slash from the base before joining" do
+      uri = described_class.new("https://example.com/").path("a", "b")
+      expect(uri.build).to eq("https://example.com/a/b")
     end
 
-    it "appends an extension to a directory-like path" do
-      result = described_class.new("dir/").with_ext("zip").build
-      expect(result).to eq "dir.zip"
+    it "produces a leading slash when the default empty base is used" do
+      uri = described_class.new.path("foo", "bar")
+      expect(uri.build).to eq("/foo/bar")
     end
 
-    it "only replaces the last extension in complex paths" do
-      result = described_class.new("my.dir/file.tar.gz").with_ext("zip").build
-      expect(result).to eq "my.dir/file.tar.zip"
+    it "returns an empty string when base is empty and no path is set" do
+      uri = described_class.new("")
+      expect(uri.build).to eq("")
+    end
+
+    it "returns a frozen string" do
+      uri = described_class.new("base").path("foo")
+      expect(uri.build).to be_frozen
+    end
+
+    it "does not mutate internal state across calls" do
+      uri = described_class.new("base").path("file.md").with_ext("html")
+      uri.build
+      expect(uri.build).to eq("base/file.html")
+    end
+  end
+
+  describe "#to_s" do
+    it "returns the same value as build" do
+      uri = described_class.new("base").path("foo", "bar").with_ext("html")
+      expect(uri.to_s).to eq(uri.build)
+    end
+
+    it "returns a frozen string" do
+      expect(described_class.new("base").to_s).to be_frozen
     end
   end
 
   describe ".wrap" do
-    it "returns the same instance if already a Simpress::Uri" do
-      expect(described_class.wrap(uri)).to eq uri
+    it "returns the exact same instance when given a Uri" do
+      uri = described_class.new("base")
+      expect(described_class.wrap(uri)).to be(uri)
     end
 
-    it "creates a new instance if a string is given" do
-      wrapped = described_class.wrap("test")
+    it "wraps a plain String in a new Uri instance" do
+      wrapped = described_class.wrap("https://example.com")
       expect(wrapped).to be_a(described_class)
-      expect(wrapped.base).to eq "test"
     end
-  end
 
-  describe "delegation" do
-    it "delegates to_s to the build method" do
-      expect(uri.path("test").to_s).to eq uri.path("test").build
+    it "preserves the String value when wrapping" do
+      wrapped = described_class.wrap("https://example.com")
+      expect(wrapped.build).to eq("https://example.com")
+    end
+
+    it "does not wrap a subclass instance as a new Uri" do
+      subclass = Class.new(described_class)
+      instance = subclass.new("base")
+      expect(described_class.wrap(instance)).to be(instance)
     end
   end
 end
