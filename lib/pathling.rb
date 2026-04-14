@@ -2,18 +2,18 @@
 
 class Pathling
   def initialize(path = "")
-    @base  = path
+    @base  = path.to_s
     @parts = []
     @ext   = nil
   end
 
   def path(*paths)
-    @parts = paths.map {|p| p.delete_prefix("/") }
+    @parts = paths.map {|p| p.to_s.delete_prefix("/") }
     self
   end
 
   def with_ext(ext)
-    @ext = ext.delete_prefix(".")
+    @ext = ext.to_s.delete_prefix(".")
     self
   end
 
