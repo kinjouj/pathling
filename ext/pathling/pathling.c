@@ -53,23 +53,25 @@ static inline pathling_t *get_pathling(VALUE self) {
 static VALUE str_delete_suffix_slash(VALUE str) {
     long len = RSTRING_LEN(str);
     if (len > 0 && RSTRING_PTR(str)[len - 1] == '/') {
-        return rb_str_new(RSTRING_PTR(str), len - 1);
+        return rb_str_subseq(str, 0, len - 1);
     }
     return str;
 }
 
 /* "/foo/bar" -> "foo/bar" */
 static VALUE str_delete_prefix_slash(VALUE str) {
-    if (RSTRING_LEN(str) > 0 && RSTRING_PTR(str)[0] == '/') {
-        return rb_str_new(RSTRING_PTR(str) + 1, RSTRING_LEN(str) - 1);
+    long len = RSTRING_LEN(str);
+    if (len > 0 && RSTRING_PTR(str)[0] == '/') {
+        return rb_str_subseq(str, 1, len - 1);
     }
     return str;
 }
 
 /* ".html" -> "html" */
 static VALUE str_delete_prefix_dot(VALUE str) {
-    if (RSTRING_LEN(str) > 0 && RSTRING_PTR(str)[0] == '.') {
-        return rb_str_new(RSTRING_PTR(str) + 1, RSTRING_LEN(str) - 1);
+    long len = RSTRING_LEN(str);
+    if (len > 0 && RSTRING_PTR(str)[0] == '.') {
+        return rb_str_subseq(str, 1, len - 1);
     }
     return str;
 }
@@ -120,27 +122,26 @@ static VALUE pathling_build(VALUE self) {
     if (!NIL_P(p->ext)) {
         long last_idx = RARRAY_LEN(parts) - 1;
         VALUE last    = rb_ary_entry(parts, last_idx);
+
+        /* find last '.' — raw pointer use is confined to this read-only scan,
+           no allocation occurs inside the loop so ptr stays valid */
         const char *ptr = RSTRING_PTR(last);
         long        len = RSTRING_LEN(last);
-
-        /* find last '.' */
         long dot_idx = -1;
         for (long i = len - 1; i >= 0; i--) {
             if (ptr[i] == '.') { dot_idx = i; break; }
         }
 
+        /* rb_str_subseq is GC-safe: takes VALUE + offsets, no raw pointer held
+           across an allocation boundary */
         VALUE new_last;
         if (dot_idx >= 0) {
-            /* replace existing extension */
-            new_last = rb_str_new(ptr, dot_idx);
-            rb_str_cat_cstr(new_last, ".");
-            rb_str_append(new_last, p->ext);
+            new_last = rb_str_subseq(last, 0, dot_idx);
         } else {
-            /* append extension */
             new_last = rb_str_dup(last);
-            rb_str_cat_cstr(new_last, ".");
-            rb_str_append(new_last, p->ext);
         }
+        rb_str_cat_cstr(new_last, ".");
+        rb_str_append(new_last, p->ext);
         rb_ary_store(parts, last_idx, new_last);
     }
 
