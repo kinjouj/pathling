@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
-require "bundler/gem_tasks"
+require "rake/extensiontask"
 require "rspec/core/rake_task"
 
-RSpec::Core::RakeTask.new(:spec)
+Rake::ExtensionTask.new("pathling") do |ext|
+  ext.lib_dir = "lib/pathling"
+  ext.ext_dir = "ext/pathling"
+end
 
-task default: :spec
+RSpec::Core::RakeTask.new(:spec)

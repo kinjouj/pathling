@@ -2,8 +2,7 @@
 
 source "https://rubygems.org"
 
-gem "irb"
-gem "rake", "~> 13.0"
+gem "rake-compiler"
 
 group :development do
   gem "rubocop", require: false
@@ -13,5 +12,4 @@ end
 
 group :test do
   gem "rspec"
-  gem "simplecov", require: false
 end

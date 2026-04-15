@@ -1,1 +1,5 @@
-/coverage/
+/tmp/
+lib/pathling/pathling.so
+lib/pathling/pathling.bundle
+ext/pathling/Makefile
+ext/pathling/*.o
